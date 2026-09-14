@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Ensure smooth scrolling and prevent iOS bounce */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+/* Custom range slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  touch-action: manipulation;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #374151;
+  border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  margin-top: -8px;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+  /* Larger touch target */
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  background: #374151;
+  border-radius: 4px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a4a6a;
+  border-radius: 3px;
+}
+
+/* Prevent text selection on SVG */
+svg text {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 640px) {
+  input[type="range"]::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    margin-top: -10px;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
