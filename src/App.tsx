@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { planets, PlanetData } from './data/planets';
 
 // Scale orbital radii for display (logarithmic-ish to fit on screen)
@@ -11,18 +11,28 @@ function getOrbitRadius(index: number): number {
 function getPlanetSize(planet: PlanetData): number {
   const maxSize = 20;
   const minSize = 5;
-  // Use log scale for sizes
   const logSize = Math.log(planet.diameter);
   const logMin = Math.log(4879);
   const logMax = Math.log(142984);
   return minSize + ((logSize - logMin) / (logMax - logMin)) * (maxSize - minSize);
 }
 
+// Generate stable star positions (memoized outside component)
+const starData = Array.from({ length: 120 }, () => ({
+  w: Math.random() * 2 + 1,
+  top: Math.random() * 100,
+  left: Math.random() * 100,
+  opacity: Math.random() * 0.7 + 0.3,
+  duration: Math.random() * 3 + 2,
+  delay: Math.random() * 5,
+}));
+
 export default function App() {
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetData | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [time, setTime] = useState(0);
+  const [hoveredPlanet, setHoveredPlanet] = useState<string | null>(null);
   const animationRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
 
@@ -51,9 +61,8 @@ export default function App() {
   const getPlanetPosition = (index: number) => {
     const planet = planets[index];
     const radius = getOrbitRadius(index);
-    // Angular velocity proportional to 1/orbitalPeriod
     const angularVelocity = (2 * Math.PI) / (planet.orbitalPeriod / 365.25);
-    const angle = time * angularVelocity * 0.5; // 0.5 factor for visual speed
+    const angle = time * angularVelocity * 0.5;
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
     return { x, y };
@@ -62,170 +71,189 @@ export default function App() {
   const svgSize = 800;
   const center = svgSize / 2;
 
+  // Memoize stars to prevent re-render flicker
+  const stars = useMemo(() => starData, []);
+
+  const handlePlanetClick = (planet: PlanetData) => {
+    setSelectedPlanet((prev) => (prev?.id === planet.id ? null : planet));
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white overflow-hidden relative">
-      {/* Stars background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 150 }).map((_, i) => (
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white overflow-x-hidden relative">
+      {/* Stars background — stable positions */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        {stars.map((star, i) => (
           <div
             key={i}
             className="absolute rounded-full bg-white"
             style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 5}s`,
+              width: star.w + 'px',
+              height: star.w + 'px',
+              top: star.top + '%',
+              left: star.left + '%',
+              opacity: star.opacity,
+              animation: `twinkle ${star.duration}s ease-in-out infinite`,
+              animationDelay: `${star.delay}s`,
             }}
           />
         ))}
       </div>
 
       {/* Header */}
-      <header className="relative z-10 text-center pt-6 pb-2">
-        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-yellow-400 bg-clip-text text-transparent">
+      <header className="relative z-10 text-center pt-4 pb-1 sm:pt-6 sm:pb-2 px-4">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-yellow-400 bg-clip-text text-transparent">
           ☀️ Interactive Solar System
         </h1>
-        <p className="text-gray-400 mt-1 text-sm md:text-base">
-          Click on any planet to learn more • Use controls to adjust the simulation
+        <p className="text-gray-400 mt-1 text-xs sm:text-sm md:text-base">
+          Tap any planet to learn more · Use controls to adjust the simulation
         </p>
       </header>
 
-      {/* Main content */}
-      <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 px-4 pb-4">
+      {/* Main content — stacks vertically on mobile, side-by-side on desktop */}
+      <div className="relative z-10 flex flex-col xl:flex-row items-center xl:items-start justify-center gap-3 sm:gap-4 px-3 sm:px-4 pb-6">
         {/* Solar System Visualization */}
-        <div className="flex-shrink-0">
-          <svg
-            viewBox={`0 0 ${svgSize} ${svgSize}`}
-            className="w-full max-w-[600px] h-auto cursor-pointer"
-            style={{ maxHeight: '70vh' }}
-          >
-            {/* Orbit paths */}
-            {planets.map((_, index) => (
-              <circle
-                key={`orbit-${index}`}
-                cx={center}
-                cy={center}
-                r={getOrbitRadius(index)}
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth="1"
-                strokeDasharray="4 4"
-              />
-            ))}
+        <div className="w-full flex justify-center flex-shrink-0">
+          <div className="w-full max-w-[500px] sm:max-w-[600px]">
+            <svg
+              viewBox={`0 0 ${svgSize} ${svgSize}`}
+              className="w-full h-auto cursor-pointer"
+              role="img"
+              aria-label="Solar system visualization with the Sun and eight orbiting planets"
+            >
+              {/* Orbit paths */}
+              {planets.map((_, index) => (
+                <circle
+                  key={`orbit-${index}`}
+                  cx={center}
+                  cy={center}
+                  r={getOrbitRadius(index)}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+              ))}
 
-            {/* Sun */}
-            <defs>
-              <radialGradient id="sunGlow">
-                <stop offset="0%" stopColor="#fff7a0" />
-                <stop offset="40%" stopColor="#ffcc00" />
-                <stop offset="70%" stopColor="#ff8800" />
-                <stop offset="100%" stopColor="#ff440000" />
-              </radialGradient>
-              <radialGradient id="sunCore">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="50%" stopColor="#ffee55" />
-                <stop offset="100%" stopColor="#ffaa00" />
-              </radialGradient>
-            </defs>
-            <circle cx={center} cy={center} r="40" fill="url(#sunGlow)" opacity="0.6" />
-            <circle cx={center} cy={center} r="25" fill="url(#sunCore)" />
-            <circle cx={center} cy={center} r="18" fill="#fff8e0" opacity="0.8" />
+              {/* Sun */}
+              <defs>
+                <radialGradient id="sunGlow">
+                  <stop offset="0%" stopColor="#fff7a0" />
+                  <stop offset="40%" stopColor="#ffcc00" />
+                  <stop offset="70%" stopColor="#ff8800" />
+                  <stop offset="100%" stopColor="#ff440000" />
+                </radialGradient>
+                <radialGradient id="sunCore">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="50%" stopColor="#ffee55" />
+                  <stop offset="100%" stopColor="#ffaa00" />
+                </radialGradient>
+              </defs>
+              <circle cx={center} cy={center} r="40" fill="url(#sunGlow)" opacity="0.6" />
+              <circle cx={center} cy={center} r="25" fill="url(#sunCore)" />
+              <circle cx={center} cy={center} r="18" fill="#fff8e0" opacity="0.8" />
 
-            {/* Planets */}
-            {planets.map((planet, index) => {
-              const pos = getPlanetPosition(index);
-              const size = getPlanetSize(planet);
-              const isSelected = selectedPlanet?.id === planet.id;
+              {/* Planets */}
+              {planets.map((planet, index) => {
+                const pos = getPlanetPosition(index);
+                const size = getPlanetSize(planet);
+                const isSelected = selectedPlanet?.id === planet.id;
+                const isHovered = hoveredPlanet === planet.id;
+                const displaySize = isHovered ? size + 3 : size;
 
-              return (
-                <g key={planet.id}>
-                  {/* Planet glow when selected */}
-                  {isSelected && (
+                return (
+                  <g key={planet.id}>
+                    {/* Invisible larger touch target for mobile */}
                     <circle
                       cx={center + pos.x}
                       cy={center + pos.y}
-                      r={size + 6}
-                      fill="none"
-                      stroke={planet.color}
-                      strokeWidth="2"
-                      opacity="0.6"
-                      className="animate-pulse"
+                      r={Math.max(size + 12, 20)}
+                      fill="transparent"
+                      className="cursor-pointer"
+                      onClick={() => handlePlanetClick(planet)}
+                      onTouchEnd={() => handlePlanetClick(planet)}
+                      onMouseEnter={() => setHoveredPlanet(planet.id)}
+                      onMouseLeave={() => setHoveredPlanet(null)}
                     />
-                  )}
-                  {/* Saturn's ring */}
-                  {planet.ringColor && (
-                    <ellipse
+                    {/* Planet glow when selected */}
+                    {isSelected && (
+                      <circle
+                        cx={center + pos.x}
+                        cy={center + pos.y}
+                        r={size + 6}
+                        fill="none"
+                        stroke={planet.color}
+                        strokeWidth="2"
+                        opacity="0.6"
+                        className="animate-pulse"
+                      />
+                    )}
+                    {/* Saturn's ring */}
+                    {planet.ringColor && (
+                      <ellipse
+                        cx={center + pos.x}
+                        cy={center + pos.y}
+                        rx={size + 8}
+                        ry={size / 3}
+                        fill="none"
+                        stroke={planet.ringColor}
+                        strokeWidth="2.5"
+                        opacity="0.7"
+                        transform={`rotate(-20, ${center + pos.x}, ${center + pos.y})`}
+                      />
+                    )}
+                    {/* Planet body */}
+                    <circle
                       cx={center + pos.x}
                       cy={center + pos.y}
-                      rx={size + 8}
-                      ry={size / 3}
-                      fill="none"
-                      stroke={planet.ringColor}
-                      strokeWidth="2.5"
-                      opacity="0.7"
-                      transform={`rotate(-20, ${center + pos.x}, ${center + pos.y})`}
+                      r={displaySize}
+                      fill={planet.color}
+                      className="pointer-events-none transition-all duration-200"
                     />
-                  )}
-                  {/* Planet body */}
-                  <circle
-                    cx={center + pos.x}
-                    cy={center + pos.y}
-                    r={size}
-                    fill={planet.color}
-                    className="cursor-pointer transition-all duration-200 hover:opacity-80"
-                    onClick={() => setSelectedPlanet(isSelected ? null : planet)}
-                    onMouseEnter={(e) => {
-                      (e.target as SVGCircleElement).setAttribute('r', String(size + 3));
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as SVGCircleElement).setAttribute('r', String(size));
-                    }}
-                  />
-                  {/* Planet label */}
-                  <text
-                    x={center + pos.x}
-                    y={center + pos.y - size - 6}
-                    textAnchor="middle"
-                    fill="rgba(255,255,255,0.7)"
-                    fontSize="9"
-                    className="pointer-events-none select-none"
-                  >
-                    {planet.name}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+                    {/* Planet label */}
+                    <text
+                      x={center + pos.x}
+                      y={center + pos.y - size - 8}
+                      textAnchor="middle"
+                      fill={isSelected || isHovered ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.6)'}
+                      fontSize="10"
+                      fontWeight={isSelected ? 'bold' : 'normal'}
+                      className="pointer-events-none select-none"
+                    >
+                      {planet.name}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
         </div>
 
-        {/* Info Panel */}
-        <div className="w-full lg:w-80 flex-shrink-0">
+        {/* Info Panel + Controls — stacked on mobile */}
+        <div className="w-full sm:max-w-md xl:w-80 xl:max-w-none flex-shrink-0 space-y-3 sm:space-y-4">
+          {/* Planet Info */}
           {selectedPlanet ? (
-            <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-2xl p-5 shadow-2xl">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-2xl p-4 sm:p-5 shadow-2xl">
+              <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <div
-                  className="w-10 h-10 rounded-full shadow-lg"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-lg flex-shrink-0"
                   style={{
                     backgroundColor: selectedPlanet.color,
                     boxShadow: `0 0 15px ${selectedPlanet.color}50`,
                   }}
                 />
-                <div>
-                  <h2 className="text-xl font-bold text-white">{selectedPlanet.name}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-white">{selectedPlanet.name}</h2>
                   <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
                     {selectedPlanet.type}
                   </span>
                 </div>
               </div>
 
-              <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+              <p className="text-gray-300 text-xs sm:text-sm mb-3 sm:mb-4 leading-relaxed">
                 {selectedPlanet.description}
               </p>
 
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 <InfoRow
                   icon="📏"
                   label="Diameter"
@@ -250,29 +278,29 @@ export default function App() {
 
               <button
                 onClick={() => setSelectedPlanet(null)}
-                className="mt-4 w-full py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-300 transition-colors"
+                className="mt-3 sm:mt-4 w-full py-2.5 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 rounded-lg text-sm text-gray-300 transition-colors"
               >
                 ✕ Close
               </button>
             </div>
           ) : (
-            <div className="bg-gray-900/60 backdrop-blur-md border border-gray-700/50 rounded-2xl p-5 shadow-xl">
-              <h2 className="text-lg font-semibold text-white mb-3">🪐 Planet Explorer</h2>
-              <p className="text-gray-400 text-sm mb-4">
-                Click on any planet in the visualization to see detailed information about it.
+            <div className="bg-gray-900/60 backdrop-blur-md border border-gray-700/50 rounded-2xl p-4 sm:p-5 shadow-xl">
+              <h2 className="text-base sm:text-lg font-semibold text-white mb-2 sm:mb-3">🪐 Planet Explorer</h2>
+              <p className="text-gray-400 text-xs sm:text-sm mb-3 sm:mb-4">
+                Tap any planet in the visualization or below to see detailed information.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {planets.map((planet) => (
                   <button
                     key={planet.id}
                     onClick={() => setSelectedPlanet(planet)}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 hover:bg-gray-700/80 rounded-lg transition-colors text-left"
+                    className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 hover:bg-gray-700/80 active:bg-gray-600/80 rounded-lg transition-colors text-left"
                   >
                     <div
                       className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: planet.color }}
                     />
-                    <span className="text-xs text-gray-300">{planet.name}</span>
+                    <span className="text-xs sm:text-sm text-gray-300 truncate">{planet.name}</span>
                   </button>
                 ))}
               </div>
@@ -280,14 +308,14 @@ export default function App() {
           )}
 
           {/* Controls */}
-          <div className="mt-4 bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-2xl p-4 shadow-xl">
+          <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-2xl p-4 sm:p-5 shadow-xl">
             <h3 className="text-sm font-semibold text-gray-300 mb-3">⚙️ Simulation Controls</h3>
 
-            {/* Play/Pause */}
-            <div className="flex items-center gap-3 mb-4">
+            {/* Play/Pause + Reset */}
+            <div className="flex items-center gap-2 sm:gap-3 mb-4">
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-medium text-sm transition-all active:scale-95 ${
                   isPlaying
                     ? 'bg-orange-600 hover:bg-orange-500 text-white'
                     : 'bg-green-600 hover:bg-green-500 text-white'
@@ -295,17 +323,19 @@ export default function App() {
               >
                 {isPlaying ? (
                   <>
-                    <span className="text-lg">⏸</span> Pause
+                    <span className="text-base sm:text-lg">⏸</span>
+                    <span>Pause</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-lg">▶</span> Play
+                    <span className="text-base sm:text-lg">▶</span>
+                    <span>Play</span>
                   </>
                 )}
               </button>
               <button
                 onClick={() => setTime(0)}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-300 transition-colors"
+                className="px-3 sm:px-4 py-2.5 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 rounded-lg text-sm text-gray-300 transition-colors active:scale-95"
               >
                 ↺ Reset
               </button>
@@ -314,7 +344,7 @@ export default function App() {
             {/* Speed Control */}
             <div>
               <label className="text-xs text-gray-400 mb-2 block">
-                Speed: <span className="text-white font-medium">{speed}×</span>
+                Speed: <span className="text-white font-medium">{speed.toFixed(1)}×</span>
               </label>
               <input
                 type="range"
@@ -332,13 +362,13 @@ export default function App() {
               </div>
             </div>
 
-            {/* Speed presets */}
-            <div className="flex gap-2 mt-3">
+            {/* Speed presets — wraps on small screens */}
+            <div className="flex flex-wrap gap-2 mt-3">
               {[0.5, 1, 2, 5, 10].map((s) => (
                 <button
                   key={s}
                   onClick={() => setSpeed(s)}
-                  className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${
+                  className={`flex-1 min-w-[3rem] py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors active:scale-95 ${
                     speed === s
                       ? 'bg-orange-600 text-white'
                       : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -358,10 +388,10 @@ export default function App() {
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-3 py-2">
-      <span className="text-lg">{icon}</span>
-      <div>
+      <span className="text-base sm:text-lg flex-shrink-0">{icon}</span>
+      <div className="min-w-0">
         <div className="text-xs text-gray-500">{label}</div>
-        <div className="text-sm text-white font-medium">{value}</div>
+        <div className="text-xs sm:text-sm text-white font-medium truncate">{value}</div>
       </div>
     </div>
   );
