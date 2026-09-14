@@ -1,1 +1,71 @@
 @import "tailwindcss";
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Custom range slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #374151;
+  border-radius: 3px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  margin-top: -6px;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #374151;
+  border-radius: 3px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f97316;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a4a6a;
+  border-radius: 3px;
+}
+
+/* Prevent text selection on SVG */
+svg text {
+  user-select: none;
+  -webkit-user-select: none;
+}
